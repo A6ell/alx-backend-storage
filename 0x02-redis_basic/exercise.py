@@ -72,6 +72,25 @@ class Cache:
 
     @count_calls
     @call_history
+    def replay(self, method: Callable) -> None:
+        """
+        Display the history of calls for a particular function.
+        :param method: The method to replay.
+        """
+        key = method.__qualname__
+        i = "".join([key, ":inputs"])
+        o = "".join([key, ":outputs"])
+
+        inputs = self._redis.lrange(i, 0, -1)
+        outputs = self._redis.lrange(o, 0, -1)
+
+        print(f"{key} was called {len(inputs)} times:")
+
+        for input_params, output_key in zip(inputs, outputs):
+            output_data = self._redis.get(output_key.decode("utf-8"))
+            print(f"{key}(*{eval(input_params)}) -> "
+                  f"{output_key.decode('utf-8')}")
+
     def store(self, data: UnionOfTypes) -> str:
         """
         generate a random key (e.g. using uuid),
