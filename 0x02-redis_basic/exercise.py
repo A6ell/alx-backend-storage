@@ -2,7 +2,6 @@
 """
 Redis module
 """
-
 import sys
 from functools import wraps
 from typing import Union, Optional, Callable, List
@@ -123,5 +122,13 @@ class Cache:
         for input_params, output_key in zip(inputs, outputs):
             input_args = eval(input_params.decode('utf-8'))  # Convert bytes to str and then evaluate
             output_data = self._redis.get(output_key.decode("utf-8"))
-            print(f"{key}(*{input_args}) -> {output_key.decode('utf-8')}")
+            print(f"{key}(*{input_args}) -> {output_data.decode('utf-8')}")
+
+if __name__ == "__main__":
+    # Example usage
+    cache = Cache()
+    cache.store("foo")
+    cache.store("bar")
+    cache.store(42)
+    cache.replay(cache.store)
 
