@@ -4,7 +4,7 @@ Redis module
 """
 import sys
 from functools import wraps
-from typing import Union, Optional, Callable
+from typing import Union, Optional, Callable, List
 from uuid import uuid4
 
 import redis
@@ -14,7 +14,7 @@ UnionOfTypes = Union[str, bytes, int, float]
 
 def count_calls(method: Callable) -> Callable:
     """
-    a system to count how many
+    A system to count how many
     times methods of the Cache class are called.
     :param method:
     :return:
@@ -38,8 +38,8 @@ def count_calls(method: Callable) -> Callable:
 
 def call_history(method: Callable) -> Callable:
     """
-    add its input parameters to one list
-    in redis, and store its output into another list.
+    Add its input parameters to one list
+    in Redis, and store its output into another list.
     :param method:
     :return:
     """
@@ -49,7 +49,7 @@ def call_history(method: Callable) -> Callable:
 
     @wraps(method)
     def wrapper(self, *args, **kwargs):
-        """ Wrapp """
+        """ Wrapper """
         self._redis.rpush(i, str(args))
         res = method(self, *args, **kwargs)
         self._redis.rpush(o, str(res))
@@ -65,13 +65,46 @@ class Cache:
 
     def __init__(self):
         """
-        constructor of the redis model
+        Constructor of the redis model
         """
         self._redis = redis.Redis()
         self._redis.flushdb()
 
     @count_calls
     @call_history
+    def store(self, data: UnionOfTypes) -> str:
+        """
+        Generate a random key (e.g. using uuid),
+        store the input data in Redis using the
+        random key and return the key.
+        :param data:
+        :return:
+        """
+        key = str(uuid4())
+        self._redis.mset({key: data})
+        return key
+
+    def get(self, key: str, fn: Optional[Callable] = None) -> UnionOfTypes:
+        """
+        Convert the data back
+        to the desired format
+        :param key:
+        :param fn:
+        :return:
+        """
+        if fn:
+            return fn(self._redis.get(key))
+        data = self._redis.get(key)
+        return data
+
+    def get_int(self, data: bytes) -> int:
+        """Get a number"""
+        return int.from_bytes(data, sys.byteorder)
+
+    def get_str(self, data: bytes) -> str:
+        """Get a string"""
+        return data.decode("utf-8")
+
     def replay(self, method: Callable) -> None:
         """
         Display the history of calls for a particular function.
@@ -88,39 +121,14 @@ class Cache:
 
         for input_params, output_key in zip(inputs, outputs):
             output_data = self._redis.get(output_key.decode("utf-8"))
-            print(f"{key}(*{eval(input_params)}) -> "
-                  f"{output_key.decode('utf-8')}")
+            print(f"{key}(*{eval(input_params)}) -> {output_key.decode('utf-8')}")
 
-    def store(self, data: UnionOfTypes) -> str:
-        """
-        generate a random key (e.g. using uuid),
-         store the input data in Redis using the
-          random key and return the key.
-        :param data:
-        :return:
-        """
-        key = str(uuid4())
-        self._redis.mset({key: data})
-        return key
 
-    def get(self, key: str, fn: Optional[Callable] = None) \
-            -> UnionOfTypes:
-        """
-        convert the data back
-        to the desired format
-        :param key:
-        :param fn:
-        :return:
-        """
-        if fn:
-            return fn(self._redis.get(key))
-        data = self._redis.get(key)
-        return data
+if __name__ == "__main__":
+    # Example usage
+    cache = Cache()
+    cache.store("foo")
+    cache.store("bar")
+    cache.store(42)
+    cache.replay(cache.store)
 
-    def get_int(self: bytes) -> int:
-        """get a number"""
-        return int.from_bytes(self, sys.byteorder)
-
-    def get_str(self: bytes) -> str:
-        """get a string"""
-        return self.decode("utf-8")
